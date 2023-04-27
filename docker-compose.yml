@@ -194,6 +194,20 @@ services:
   #     - 4326:4326
   #     - 4327:4327
 
+  ##################################
+  #   DB FOR POSSIBLE PLUGIN USE   #
+  ##################################
+  plugin_db:
+      image: postgres
+      restart: always
+      environment:
+        POSTGRES_PASSWORD: secure_password
+  plugin_db_adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 127.0.0.18080:8080
+
 volumes:
     prometheus-tsdb: {}
     grafana-lib: {}
