@@ -1,0 +1,199 @@
+##################################
+#   EMMELNET SERVER STACK 4      #
+##################################
+
+#### PORTS ###################
+# BUNGEECORD: 25565
+# BUNGECORD GEYSER: 19132
+
+# MAIN SERVER: 25566
+# MAIN RCON: 25576
+
+# LOBBY SERVER: 25567
+# LOBBY RCON: 25577
+
+# TEST/BUILD SERVER: 25568
+# TEST/BUILD RCON: 25578
+###############################
+
+version: "3"
+name: mc-server
+
+services:
+  ###################
+  #   MAIN SERVER   #
+  ###################
+  main_server:
+    image: itzg/minecraft-server
+    container_name: main_server
+    ports:
+      - 127.0.0.1:25565:25565/udp
+      - 127.0.0.1:25565:25565/tcp
+      - 127.0.0.1:25576:25575
+      - 127.0.0.1:19132:19132/udp
+      - 127.0.0.1:19132:19132/tcp
+    environment:
+      EULA: "TRUE"
+      ENABLE_RCON: "TRUE"
+      JAVA_HOME: "/opt/java/openjdk"
+      JAVA_VERSION: "jdk-17.0.1+12"
+      JVM_XX_OPTS: "-XX:MaxRAMPercentage=90"
+      MEMORY: "20G"
+      RCON_PASSWORD: "xJ63ptDpixy64K5x"
+      RCON_PORT: "25575"
+      TYPE: "PAPER"
+      TZ: "Europe/Berlin"
+      VERSION: "1.19.2"
+      #CUSTOM_SERVER: "https://api.papermc.io/v2/projects/paper/versions/1.19.2/builds/307/downloads/paper-1.19.2-307.jar"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./servers/main_server:/data
+
+  ####################
+  #   BUILD SERVER   #
+  ####################
+  # build_server:
+  #   image: itzg/minecraft-server
+  #   container_name: build_server
+  #   ports:
+  #     - 127.0.0.1:25568:25565
+  #     - 127.0.0.1:25578:25575
+  #   environment:
+  #     EULA: "TRUE"
+  #     ENABLE_RCON: "TRUE"
+  #     JAVA_HOME: "/opt/java/openjdk"
+  #     JAVA_VERSION: "jdk-17.0.1+12"
+  #     JVM_XX_OPTS: "-XX:MaxRAMPercentage=90"
+  #     MEMORY: "512M"
+  #     RCON_PASSWORD: "minecraft"
+  #     RCON_PORT: "25575"
+  #     TYPE: "SPIGOT"
+  #     TZ: "Europr/Berlin"
+  #     VERSION: "LATEST"
+  #   tty: true
+  #   stdin_open: true
+  #   volumes:
+  #     - ./servers/build_server:/data
+
+
+  #########################
+  #   BUNGEECORD SERVER   #
+  #########################
+  # bungeecord:
+  #   image: itzg/bungeecord
+  #   container_name: bungeecord
+  #   ports:
+  #     - 25565:25577
+  #     - 19132:19132
+  #   environment:
+  #     SERVER_PORT: "25577"
+  #   volumes:
+  #     - ./servers/bungeecord:/server
+
+
+  ####################
+  #   LOBBY SERVER   #
+  ####################
+  # lobby_server:
+  #   image: itzg/minecraft-server
+  #.  container_name: lobby_server
+  #   ports:
+  #     - 127.0.0.1:25567:25565
+  #     - 127.0.0.1:25577:25575
+  #   environment:
+  #     EULA: "TRUE"
+  #     ENABLE_RCON: "TRUE"
+  #     JAVA_HOME: "/opt/java/openjdk"
+  #     JAVA_VERSION: "jdk-17.0.1+12"
+  #     JVM_XX_OPTS: "-XX:MaxRAMPercentage=90"
+  #     MEMORY: "2G"
+  #     RCON_PASSWORD: "minecraft"
+  #     RCON_PORT: "25575"
+  #     TYPE: "SPIGOT"
+  #     TZ: "Europr/Berlin"
+  #     VERSION: "LATEST"
+  #   volumes:
+  #     - ./servers/lobby_server:/data
+
+
+  ######################
+  #   BACKUP SERVICE   #
+  ######################
+  backup_main_server:
+    image: itzg/mc-backup
+    container_name: backup_main_server
+    environment:
+      TZ: "Europe/Berlin"
+      BACKUP_METHOD: "rclone"
+      BACKUP_INTERVAL: "1h"
+      INITIAL_DELAY: "120"
+      PAUSE_IF_NO_PLAYERS: "true"
+      RCON_HOST: main_server
+      RCON_PORT: 25575
+      RCON_PASSWORD: "xJ63ptDpixy64K5x"
+      RCLONE_REMOTE: "backup-onedrive"
+      DES_DIR: "/backup"
+      RCLONE_DEST_DIR: "/BACKUPS/MINECRAFT_SERVERS/CRAFT_ATTACK23"
+    volumes:
+      - ./servers/main_server:/data:ro
+      - ./rclone/rclone.config:/config/rclone/rclone.conf:ro
+      - ./rclone/tempbackup/:/backup
+  ###############
+  #   MONITOR   #
+  ###############
+  monitor:
+    image: itzg/mc-monitor
+    command: export-for-prometheus
+    container_name: monitor_main_server
+    environment:
+      EXPORT_SERVERS: main_server
+      DEBUG: "true"
+    depends_on:
+      - main_server
+  cadvisor:
+    container_name: cadvisor
+    image: gcr.io/cadvisor/cadvisor
+    ports:
+      - "127.0.0.1:8180:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-tsdb:/prometheus
+    depends_on:
+      - main_server
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss:${GRAFANA_VERSION:-8.3.3}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana-lib:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards
+    depends_on:
+      - prometheus
+  ################
+  #   WEB-RCON   #
+  ################
+  # web:
+  #   image: itzg/rcon
+  #   container_name: rcon_web
+  #   environment:
+  #     RWA_USERNAME: admin
+  #     RWA_PASSWORD: admin
+  #     RWA_ADMIN: "TRUE"
+  #   ports:
+  #     - 4326:4326
+  #     - 4327:4327
+
+volumes:
+    prometheus-tsdb: {}
+    grafana-lib: {}
