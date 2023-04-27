@@ -137,12 +137,12 @@ services:
       RCLONE_DEST_DIR: "/BACKUPS/MINECRAFT_SERVERS/CRAFT_ATTACK23"
     volumes:
       - ./servers/main_server:/data:ro
-      - ./rclone/rclone.config:/config/rclone/rclone.conf:ro
-      - ./rclone/tempbackup/:/backup
+      - ./backup/rclone.config:/config/rclone/rclone.conf:ro
+      - ./backup/tempbackup/:/backup
   ###############
   #   MONITOR   #
   ###############
-  monitor:
+  monitor_main_server:
     image: itzg/mc-monitor
     command: export-for-prometheus
     container_name: monitor_main_server
